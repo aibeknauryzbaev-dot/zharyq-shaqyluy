@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Жарықтың шағылуын зерттеу (Pixar Style)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0f8ff;
+            background-image: radial-gradient(#d4e8fb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .btn-pixar {
+            transition: all 0.1s;
+            border-bottom-width: 6px;
+        }
+        .btn-pixar:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+            margin-bottom: 4px;
+        }
+
+        .btn-blue {
+            background-color: #38bdf8;
+            border-color: #0284c7;
+            color: white;
+        }
+        .btn-blue.active {
+            background-color: #0284c7;
+            border-bottom-width: 2px;
+            transform: translateY(4px);
+            margin-bottom: 4px;
+        }
+
+        .btn-dark {
+            background-color: #334155;
+            border-color: #0f172a;
+            color: white;
+        }
+        .btn-dark.active {
+            background-color: #0f172a;
+            border-bottom-width: 2px;
+            transform: translateY(4px);
+            margin-bottom: 4px;
+        }
+
+        .canvas-container {
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5), 0 0 20px rgba(56, 189, 248, 0.2);
+            border: 8px solid #0f172a;
+            border-radius: 30px;
+            overflow: hidden;
+            background: radial-gradient(circle at 12.5% 50%, #1e3a8a 0%, #020617 80%); 
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            padding: 10px 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 36px;
+            width: 36px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            margin-top: -12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            border: 4px solid #fff;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 12px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col items-center p-2 sm:p-4 text-slate-800 box-border">
+
+    <div class="max-w-6xl w-full h-full flex flex-col items-center justify-between">
+        
+        <!-- Тақырып -->
+        <div class="flex-shrink-0 text-center mb-2 mt-1">
+            <h1 class="text-3xl md:text-4xl font-black mb-1 text-slate-800 drop-shadow-md">
+                Жарық зертханасы <span class="text-yellow-400">💡</span>
+            </h1>
+            <p class="text-base md:text-lg font-bold text-slate-500">
+                Қосу/өшіру үшін <span class="text-sky-500">фонариктің үстінен басыңыз!</span>
+            </p>
+        </div>
+
+        <!-- Симуляция аймағы -->
+        <div class="canvas-container w-full flex-grow relative flex items-center justify-center">
+            <canvas id="simCanvas" width="800" height="450" class="max-w-full max-h-full object-contain block"></canvas>
+        </div>
+
+        <!-- Басқару панелі -->
+        <div class="bg-white p-4 md:p-6 mt-3 rounded-3xl shadow-xl border-4 border-slate-100 w-full flex flex-col sm:flex-row gap-6 flex-shrink-0">
+            
+            <div class="flex-1">
+                <h3 class="text-lg font-bold mb-3 text-slate-700">Нысанды таңдаңыз:</h3>
+                <div class="flex gap-4 h-16">
+                    <button id="btnMirror" class="btn-pixar btn-blue active flex-1 rounded-2xl font-bold text-xl shadow-lg flex items-center justify-center gap-2">
+                        <span class="text-2xl">🪞</span> Айна
+                    </button>
+                    <button id="btnBlackBody" class="btn-pixar btn-dark flex-1 rounded-2xl font-bold text-xl shadow-lg flex items-center justify-center gap-2">
+                        <span class="text-2xl">⬛</span> Қара дене
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col gap-3 justify-center">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="font-bold text-slate-700 text-lg">Фонарик бұрышы</label>
+                        <span id="angleValue" class="font-bold text-sky-500 text-lg">0°</span>
+                    </div>
+                    <input type="range" id="angleSlider" min="-45" max="45" value="0">
+                </div>
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="font-bold text-slate-700 text-lg">Фонарик биіктігі</label>
+                    </div>
+                    <input type="range" id="heightSlider" min="50" max="400" value="225">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const angleSlider = document.getElementById('angleSlider');
+        const heightSlider = document.getElementById('heightSlider');
+        const angleValueDisplay = document.getElementById('angleValue');
+        const btnMirror = document.getElementById('btnMirror');
+        const btnBlackBody = document.getElementById('btnBlackBody');
+
+        // Күй (State) - Анимация үшін жаңа айнымалылар қосылды
+        let simState = {
+            angleDeg: 0,
+            lightY: 225,
+            material: 'mirror',
+            targetX: 650,
+            targetY: 125,
+            targetWidth: 30,
+            targetHeight: 200,
+            lightX: 100,
+            isLightOn: true,
+            targetOpacity: 1,    // Жарықтың баратын мөлдірлігі
+            currentOpacity: 1,   // Қазіргі мөлдірлігі (анимация үшін)
+            time: 0              // Пульсация эффектісі үшін уақыт
+        };
+
+        // Басқару элементтеріндегі оқиғалар
+        angleSlider.addEventListener('input', (e) => {
+            simState.angleDeg = parseInt(e.target.value);
+            angleValueDisplay.innerText = `${-simState.angleDeg}°`;
+        });
+
+        heightSlider.addEventListener('input', (e) => {
+            simState.lightY = parseInt(e.target.value);
+        });
+
+        btnMirror.addEventListener('click', () => {
+            simState.material = 'mirror';
+            btnMirror.classList.add('active');
+            btnBlackBody.classList.remove('active');
+        });
+
+        btnBlackBody.addEventListener('click', () => {
+            simState.material = 'blackbody';
+            btnBlackBody.classList.add('active');
+            btnMirror.classList.remove('active');
+        });
+
+        // ==========================================
+        // Фонарикті басуды анықтау жүйесі
+        // ==========================================
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let clientX = evt.clientX;
+            let clientY = evt.clientY;
+
+            // Touch (саусақпен басу) оқиғаларын қолдау
+            if(evt.touches && evt.touches.length > 0) {
+                clientX = evt.touches[0].clientX;
+                clientY = evt.touches[0].clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function isPointInFlashlight(x, y) {
+            // Фонариктің ортасынан қашықтықты есептеу
+            const dx = x - simState.lightX;
+            const dy = y - simState.lightY;
+
+            // Бұрышты кері бұру (математикалық есептеу)
+            const angleRad = simState.angleDeg * Math.PI / 180;
+            const cosA = Math.cos(-angleRad);
+            const sinA = Math.sin(-angleRad);
+
+            const rx = dx * cosA - dy * sinA;
+            const ry = dx * sinA + dy * cosA;
+
+            // Фонариктің шекаралары (drawFlashlight функциясындағы өлшемдер бойынша)
+            return rx >= -80 && rx <= 45 && ry >= -35 && ry <= 35;
+        }
+
+        // Клик немесе түрту
+        canvas.addEventListener('pointerdown', (e) => {
+            const pos = getMousePos(e);
+            if (isPointInFlashlight(pos.x, pos.y)) {
+                simState.isLightOn = !simState.isLightOn;
+                simState.targetOpacity = simState.isLightOn ? 1 : 0;
+            }
+        });
+
+        // Курсорды қолға (pointer) өзгерту
+        canvas.addEventListener('pointermove', (e) => {
+            const pos = getMousePos(e);
+            if (isPointInFlashlight(pos.x, pos.y)) {
+                canvas.style.cursor = 'pointer';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        // ==========================================
+        // Суреттеу және Анимация
+        // ==========================================
+
+        function drawFlashlight(x, y, angleRad) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angleRad);
+
+            // Денесі
+            ctx.fillStyle = '#ff5a5f'; 
+            ctx.beginPath();
+            ctx.roundRect(-80, -20, 90, 40, 15);
+            ctx.fill();
+
+            // Дене көлеңкесі
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.roundRect(-80, 0, 90, 20, {bl: 15, br: 15});
+            ctx.fill();
+
+            // Басы (Сұр бөлігі)
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.roundRect(5, -30, 30, 60, 10);
+            ctx.fill();
+
+            // Бас көлеңкесі
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.roundRect(5, 0, 30, 30, {bl: 10, br: 10});
+            ctx.fill();
+
+            // Линзасы (Қосулы болса сары, өшік болса қою сұр)
+            ctx.fillStyle = simState.isLightOn ? '#fef08a' : '#64748b';
+            ctx.beginPath();
+            ctx.ellipse(35, 0, 8, 25, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            if (simState.isLightOn) {
+                ctx.shadowColor = '#fef08a';
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0; // Қалпына келтіру
+            }
+
+            // Түймешік (Қосулы: Жасыл, Өшік: Қызыл)
+            ctx.fillStyle = simState.isLightOn ? '#34d399' : '#f87171';
+            ctx.beginPath();
+            ctx.roundRect(-40, -25, 20, 10, 5);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawTarget() {
+            ctx.save();
+            if (simState.material === 'mirror') {
+                ctx.fillStyle = '#e2e8f0'; 
+                ctx.shadowColor = '#60a5fa';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.roundRect(simState.targetX, simState.targetY, simState.targetWidth, simState.targetHeight, 10);
+                ctx.fill();
+
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(simState.targetX + 5, simState.targetY + 20);
+                ctx.lineTo(simState.targetX + 25, simState.targetY + 40);
+                ctx.moveTo(simState.targetX + 5, simState.targetY + 60);
+                ctx.lineTo(simState.targetX + 25, simState.targetY + 80);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(simState.targetX, simState.targetY, simState.targetWidth, simState.targetHeight);
+
+            } else {
+                ctx.fillStyle = '#1e293b'; 
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 20;
+                ctx.beginPath();
+                ctx.roundRect(simState.targetX, simState.targetY, simState.targetWidth, simState.targetHeight, 10);
+                ctx.fill();
+
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 2;
+                for(let i=10; i<simState.targetHeight; i+=20) {
+                    ctx.beginPath();
+                    ctx.moveTo(simState.targetX + 5, simState.targetY + i);
+                    ctx.lineTo(simState.targetX + simState.targetWidth - 5, simState.targetY + i);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawLightBeam() {
+            // Егер мөлдірлік өте төмен болса, суреттемейміз (сөніп қалғанда)
+            if (simState.currentOpacity < 0.01) return;
+
+            // Жұмсақ пульсация анимациясы (тірі сияқты лүпілдейді)
+            const flicker = 0.95 + 0.05 * Math.sin(simState.time / 100);
+            const activeOpacity = simState.currentOpacity * flicker;
+
+            const angleRad = simState.angleDeg * Math.PI / 180;
+            const startX = simState.lightX + 35 * Math.cos(angleRad);
+            const startY = simState.lightY + 35 * Math.sin(angleRad);
+            
+            const hitY = Math.tan(angleRad) * (simState.targetX - startX) + startY;
+
+            let isHit = false;
+            let endX = 850; 
+            let endY = Math.tan(angleRad) * (endX - startX) + startY;
+
+            if (hitY >= simState.targetY && hitY <= simState.targetY + simState.targetHeight) {
+                isHit = true;
+                endX = simState.targetX;
+                endY = hitY;
+            }
+
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            function drawBeam(x1, y1, x2, y2, baseOpacity) {
+                const finalOpacity = baseOpacity * activeOpacity;
+                
+                // Жарықтың өзегі
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = `rgba(255, 255, 200, ${finalOpacity})`;
+                ctx.lineWidth = 15;
+                ctx.shadowColor = '#fde047';
+                ctx.shadowBlur = 30;
+                ctx.stroke();
+
+                // Жарықтың сырты
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = `rgba(253, 224, 71, ${finalOpacity * 0.5})`;
+                ctx.lineWidth = 30;
+                ctx.shadowBlur = 50;
+                ctx.stroke();
+            }
+
+            // Түскен сәуле
+            drawBeam(startX, startY, endX, endY, 0.8);
+
+            // Нысанға тию эффектілері
+            if (isHit) {
+                if (simState.material === 'mirror') {
+                    // Айнадан шағылу
+                    const reflectAngleRad = Math.PI - angleRad; 
+                    const reflectEndX = -100; 
+                    const reflectEndY = endY + Math.tan(reflectAngleRad) * (reflectEndX - endX);
+                    
+                    drawBeam(endX, endY, reflectEndX, reflectEndY, 0.7);
+
+                    // Шағылу нүктесіндегі жарқырау
+                    ctx.beginPath();
+                    ctx.arc(endX, endY, 15, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${activeOpacity})`;
+                    ctx.shadowColor = 'white';
+                    ctx.shadowBlur = 20;
+                    ctx.fill();
+
+                } else if (simState.material === 'blackbody') {
+                    // Қара дене жұтылуы (Жылу дағы)
+                    ctx.beginPath();
+                    ctx.ellipse(endX, endY, 8, 25, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(239, 68, 68, ${0.8 * activeOpacity})`; 
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 30;
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(endX, endY, 4, 15, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(253, 224, 71, ${0.9 * activeOpacity})`; 
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        // Анимация циклі (Game Loop сияқты)
+        function animate(timestamp) {
+            simState.time = timestamp;
+
+            // Мөлдірлікті бірқалыпты (smooth) өзгерту
+            const diff = simState.targetOpacity - simState.currentOpacity;
+            simState.currentOpacity += diff * 0.1; 
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawLightBeam();
+            drawTarget();
+            
+            const angleRad = simState.angleDeg * Math.PI / 180;
+            drawFlashlight(simState.lightX, simState.lightY, angleRad);
+
+            requestAnimationFrame(animate);
+        }
+
+        // Анимацияны бастау
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>
