@@ -1,0 +1,2 @@
+# zharyq-shaqyluy
+Жарықтың шағылуы
